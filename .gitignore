@@ -1,0 +1,36 @@
+# vim swap files
+**/.*.swp
+
+# local fiddling-about directory
+local/
+
+# virtual environment
+.venv/
+venv/
+
+# linting cache files
+.lintcache/
+
+# ingestion script/tester temporary files and cache
+test.sql
+**/__pycache__/
+
+# bash script files to start and run postgresql db
+db*.sh
+
+# django cache and test files
+# **/.coverage*
+.coverage
+zoosite-main/zooapp/unittest/coverage/**
+coverage/
+zoosite-main/zoosite/.env
+*.env.*
+
+# development database instance
+dev/db/*
+**/zoodb.sqlite3
+
+# local media files
+media/*
+*test_media*
+
