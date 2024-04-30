@@ -20,15 +20,10 @@ db*.sh
 
 # django cache and test files
 # **/.coverage*
-.coverage
-zoosite-main/zooapp/unittest/coverage/**
-coverage/
-zoosite-main/zoosite/.env
 *.env.*
 
 # development database instance
-dev/db/*
-**/zoodb.sqlite3
+*.sqlite3
 
 # local media files
 media/*
