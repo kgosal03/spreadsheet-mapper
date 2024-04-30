@@ -1,13 +1,15 @@
-from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.shortcuts import render
 from django.apps import apps
-import pandas as pd
-from python_calamine import CalamineWorkbook
+from django.db.utils import IntegrityError
+import openpyxl as px
+import re
 
-model_names = [
+MODELS = [
     model.__name__ 
     for model in apps.get_models()
 ]
+
+RE_LETTERS = re.compile(r"([A-Z]+)")
 
 def upload_spreadsheet(request):
     if request.method == 'POST' and request.FILES['file']:
@@ -17,37 +19,39 @@ def upload_spreadsheet(request):
 
 def ingest_spreadsheet(request, uploaded_file):
 
-    def callback(model_name, workbook):
-        Model = apps.get_model(app_label="spreadsheetMapping", model_name=model_name)
-
-        rows = iter(workbook.get_sheet_by_index(0).to_python())
-        headers = next(rows)
-
-        model_fields = [ 
-            field.name.lower() 
+    def callback(Model, sheet):
+        column_header_mapping = {
+            field.help_text.lower(): field.name.lower()
             for field in Model._meta.fields
-        ][1:]
-        
-        for row in rows:
-            # Map spreadsheet columns to model fields using verbose names
-            contact_data = {
-                model_fields[i]: row[i]
-                for i in range(len(row))
+        }
+
+        # Remove the id field
+        del column_header_mapping['']
+
+        for row in sheet.iter_rows(min_row=2):
+            row_data = {}
+            for cell in row:
+                letters = RE_LETTERS.match(cell.coordinate).group(1)
+                row_data[letters.lower()] = cell.value
+
+            # Shuffle the data into the correct order as it appears in the model
+            shuffled_row_data = {
+                column_header_mapping[key]: row_data[key]
+                for key in column_header_mapping.keys()
             }
-            # Create Contact instances using the mapped data
-            contact = Model(**contact_data)
-            # Perform any further actions with the Contact instance
-            contact.save() # Save the Contact to the database, for example
+
+            try:
+                instance = Model(**shuffled_row_data)
+                instance.save()
+            except IntegrityError as e:
+                print(f"Error saving {shuffled_row_data} to {Model.__name__} due to {e}")
+
+    workbook = px.load_workbook(uploaded_file)
+    considering = list(filter(lambda x: x in MODELS, workbook.sheetnames))
     
-    workbook = CalamineWorkbook.from_filelike(uploaded_file)
-    considering = [
-        model_name
-        for model_name in model_names
-        if model_name in workbook.sheet_names
-    ]
-    
-    for item in considering:
-        callback(item, workbook)
+    for name in considering:
+        Model = apps.get_model(app_label="spreadsheetMapping", model_name=name)
+        sheet = workbook[name]
+        callback(Model, sheet)
 
     return render(request, 'success.html')
-
